@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Magic Card Crush</title>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f0f0f0;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+      }
+
+      #game-board {
+        display: grid;
+        grid-template-columns: repeat(7, 70px);
+        grid-template-rows: repeat(6, 70px);
+        gap: 5px;
+        background-color: #fff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+      }
+
+      .card {
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 34px;
+        font-weight: bold;
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 0.9);
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+      }
+
+      .card:hover {
+        transform: scale(1.15);
+        z-index: 1;
+      }
+
+      .selected {
+        border: 3px solid #000 !important;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      }
+
+      #score {
+        font-size: 28px;
+        margin: 25px;
+        font-family: Arial, sans-serif;
+        color: #333;
+      }
+
+      .suit-1 {
+        color: #ff0000;
+        border: 2px solid #ff0000;
+      }
+      .suit-2 {
+        color: #ff0000;
+        border: 2px solid #ff0000;
+      }
+      .suit-3 {
+        color: #000000;
+        border: 2px solid #000000;
+      }
+      .suit-4 {
+        color: #000000;
+        border: 2px solid #000000;
+      }
+      .suit-5 {
+        color: #800080;
+        border: 2px solid #800080;
+      }
+      .suit-6 {
+        color: #ffa500;
+        border: 2px solid #ffa500;
+      }
+
+      @keyframes appear {
+        from {
+          opacity: 0;
+          transform: scale(0.5);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes match {
+        50% {
+          transform: scale(1.3);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="score">Pontuação: 0</div>
+    <div id="game-board"></div>
+
+    <script>
+      const BOARD_WIDTH = 7;
+      const BOARD_HEIGHT = 6;
+      const SUIT_TYPES = 6;
+      let selectedCard = null;
+      let score = 0;
+
+      const board = [];
+      const gameBoard = document.getElementById("game-board");
+      const scoreElement = document.getElementById("score");
+
+      const suitSymbols = ["♥", "♦", "♣", "♠", "★", "▲"];
+
+      function initializeBoard() {
+        for (let i = 0; i < BOARD_HEIGHT; i++) {
+          board[i] = [];
+          for (let j = 0; j < BOARD_WIDTH; j++) {
+            createCard(i, j);
+          }
+        }
+      }
+
+      function createCard(row, col) {
+        const suit = Math.floor(Math.random() * SUIT_TYPES) + 1;
+        board[row][col] = {
+          suit: suit,
+          element: document.createElement("div"),
+        };
+        updateCardAppearance(row, col);
+        board[row][col].element.addEventListener("click", () =>
+          handleClick(row, col)
+        );
+        gameBoard.appendChild(board[row][col].element);
+      }
+
+      function handleClick(row, col) {
+        if (!selectedCard) {
+          selectedCard = { row, col };
+          board[row][col].element.classList.add("selected");
+        } else {
+          const { row: row1, col: col1 } = selectedCard;
+          const isAdjacent =
+            (Math.abs(row - row1) === 1 && col === col1) ||
+            (Math.abs(col - col1) === 1 && row === row1);
+
+          if (isAdjacent) {
+            swapCards(row1, col1, row, col);
+            checkMatches();
+            selectedCard = null;
+            board[row1][col1].element.classList.remove("selected");
+          } else {
+            selectedCard = null;
+            board[row1][col1].element.classList.remove("selected");
+          }
+        }
+      }
+
+      function swapCards(row1, col1, row2, col2) {
+        [board[row1][col1].element, board[row2][col2].element].forEach((el) => {
+          el.style.transform = "scale(1.2)";
+          setTimeout(() => (el.style.transform = "scale(1)"), 300);
+        });
+
+        const temp = board[row1][col1].suit;
+        board[row1][col1].suit = board[row2][col2].suit;
+        board[row2][col2].suit = temp;
+
+        updateCardAppearance(row1, col1);
+        updateCardAppearance(row2, col2);
+      }
+
+      function updateCardAppearance(row, col) {
+        const card = board[row][col];
+        card.element.className = `card suit-${card.suit}`;
+        card.element.textContent = suitSymbols[card.suit - 1];
+        card.element.style.animation = "appear 0.3s ease";
+      }
+
+      function checkMatches() {
+        let matchesFound = false;
+        const visited = Array.from({ length: BOARD_HEIGHT }, () =>
+          Array(BOARD_WIDTH).fill(false)
+        );
+        const matches = [];
+
+        function findConnected(row, col, targetSuit, group) {
+          if (row < 0 || row >= BOARD_HEIGHT || col < 0 || col >= BOARD_WIDTH)
+            return;
+          if (visited[row][col] || board[row][col].suit !== targetSuit) return;
+
+          visited[row][col] = true;
+          group.push({ row, col });
+
+          findConnected(row - 1, col, targetSuit, group);
+          findConnected(row + 1, col, targetSuit, group);
+          findConnected(row, col - 1, targetSuit, group);
+          findConnected(row, col + 1, targetSuit, group);
+        }
+
+        for (let i = 0; i < BOARD_HEIGHT; i++) {
+          for (let j = 0; j < BOARD_WIDTH; j++) {
+            if (!visited[i][j] && board[i][j].suit !== 0) {
+              const group = [];
+              findConnected(i, j, board[i][j].suit, group);
+              if (group.length >= 3) {
+                matches.push(group);
+              }
+            }
+          }
+        }
+
+        if (matches.length > 0) {
+          matchesFound = true;
+          matches.forEach((group) => {
+            const comboSize = group.length;
+            let multiplier = 1;
+
+            if (comboSize === 4) multiplier = 2;
+            else if (comboSize >= 5) multiplier = 4;
+
+            group.forEach(({ row, col }) => {
+              board[row][col].element.style.animation = "match 0.4s ease";
+              score += 10 * multiplier;
+            });
+          });
+
+          scoreElement.textContent = `Pontuação: ${score}`;
+
+          setTimeout(() => {
+            matches.forEach((group) => {
+              group.forEach(({ row, col }) => {
+                removeMatch(row, col);
+              });
+            });
+            applyGravity();
+            setTimeout(checkMatches, 500);
+          }, 300);
+        }
+
+        return matchesFound;
+      }
+
+      function removeMatch(row, col) {
+        board[row][col].suit = 0;
+        board[row][col].element.textContent = "";
+      }
+
+      function applyGravity() {
+        for (let j = 0; j < BOARD_WIDTH; j++) {
+          let emptySpaces = [];
+
+          for (let i = BOARD_HEIGHT - 1; i >= 0; i--) {
+            if (board[i][j].suit === 0) {
+              emptySpaces.push(i);
+            } else if (emptySpaces.length > 0) {
+              const newPos = emptySpaces.shift();
+              board[newPos][j].suit = board[i][j].suit;
+              board[i][j].suit = 0;
+              updateCardAppearance(newPos, j);
+              updateCardAppearance(i, j);
+              emptySpaces.push(i);
+            }
+          }
+
+          emptySpaces.forEach((i) => {
+            board[i][j].suit = Math.floor(Math.random() * SUIT_TYPES) + 1;
+            updateCardAppearance(i, j);
+          });
+        }
+      }
+
+      initializeBoard();
+    </script>
+  </body>
+</html>
