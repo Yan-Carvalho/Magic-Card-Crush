@@ -100,22 +100,76 @@
           transform: scale(1);
         }
       }
+
+      #round-counter {
+        font-size: 24px;
+        margin: 10px;
+        font-family: Arial, sans-serif;
+        color: #333;
+      }
+
+      .disabled {
+        position: relative;
+        overflow: hidden;
+        cursor: not-allowed;
+      }
+
+      .disabled::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: repeating-linear-gradient(
+          45deg,
+          rgba(0, 0, 0, 0.1),
+          rgba(0, 0, 0, 0.1) 10px,
+          rgba(0, 0, 0, 0.2) 10px,
+          rgba(0, 0, 0, 0.2) 20px
+        );
+        animation: disableEffect 1s infinite;
+      }
+
+      @keyframes screenFlash {
+        0% {
+          background-color: transparent;
+        }
+        50% {
+          background-color: rgba(255, 255, 0, 0.5);
+        }
+        100% {
+          background-color: transparent;
+        }
+      }
+
+      @keyframes disableEffect {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
     </style>
   </head>
   <body>
     <div id="score">Pontuação: 0</div>
+    <div id="round-counter">Rodada: 1</div>
     <div id="game-board"></div>
-
     <script>
       const BOARD_WIDTH = 7;
       const BOARD_HEIGHT = 6;
       const SUIT_TYPES = 6;
       let selectedCard = null;
       let score = 0;
+      let currentRound = 1;
+      let disabledBlocks = [];
 
       const board = [];
       const gameBoard = document.getElementById("game-board");
       const scoreElement = document.getElementById("score");
+      const roundElement = document.getElementById("round-counter");
 
       const suitSymbols = ["♥", "♦", "♣", "♠", "★", "▲"];
 
@@ -142,6 +196,8 @@
       }
 
       function handleClick(row, col) {
+        if (isBlockDisabled(row, col)) return;
+
         if (!selectedCard) {
           selectedCard = { row, col };
           board[row][col].element.classList.add("selected");
@@ -153,7 +209,15 @@
 
           if (isAdjacent) {
             swapCards(row1, col1, row, col);
+
+            // Conta a rodada a cada troca válida
+            currentRound++;
+            roundElement.textContent = `Rodada: ${currentRound}`;
+            checkSpecialRound();
+
+            // Verifica combos após a troca
             checkMatches();
+
             selectedCard = null;
             board[row1][col1].element.classList.remove("selected");
           } else {
@@ -163,7 +227,51 @@
         }
       }
 
+      function isBlockDisabled(row, col) {
+        return disabledBlocks.some(
+          (b) => b.row === row && b.col === col && b.rounds > 0
+        );
+      }
+
+      function checkSpecialRound() {
+        if (currentRound % 5 === 0) {
+          // Efeito de piscar
+          document.body.style.animation = "screenFlash 0.5s 3";
+          setTimeout(() => {
+            document.body.style.animation = "";
+          }, 1500);
+
+          // Desabilitar bloco aleatório
+          let randomRow, randomCol;
+          do {
+            randomRow = Math.floor(Math.random() * BOARD_HEIGHT);
+            randomCol = Math.floor(Math.random() * BOARD_WIDTH);
+          } while (isBlockDisabled(randomRow, randomCol));
+
+          disabledBlocks.push({
+            row: randomRow,
+            col: randomCol,
+            rounds: 5,
+          });
+
+          board[randomRow][randomCol].element.classList.add("disabled");
+        }
+
+        // Atualizar contagem de rodadas
+        disabledBlocks = disabledBlocks
+          .map((b) => {
+            b.rounds--;
+            if (b.rounds === 0) {
+              board[b.row][b.col].element.classList.remove("disabled");
+            }
+            return b;
+          })
+          .filter((b) => b.rounds > 0);
+      }
+
       function swapCards(row1, col1, row2, col2) {
+        if (isBlockDisabled(row1, col1) || isBlockDisabled(row2, col2)) return;
+
         [board[row1][col1].element, board[row2][col2].element].forEach((el) => {
           el.style.transform = "scale(1.2)";
           setTimeout(() => (el.style.transform = "scale(1)"), 300);
@@ -194,7 +302,12 @@
         function findConnected(row, col, targetSuit, group) {
           if (row < 0 || row >= BOARD_HEIGHT || col < 0 || col >= BOARD_WIDTH)
             return;
-          if (visited[row][col] || board[row][col].suit !== targetSuit) return;
+          if (
+            visited[row][col] ||
+            board[row][col].suit !== targetSuit ||
+            isBlockDisabled(row, col)
+          )
+            return;
 
           visited[row][col] = true;
           group.push({ row, col });
@@ -207,7 +320,11 @@
 
         for (let i = 0; i < BOARD_HEIGHT; i++) {
           for (let j = 0; j < BOARD_WIDTH; j++) {
-            if (!visited[i][j] && board[i][j].suit !== 0) {
+            if (
+              !visited[i][j] &&
+              board[i][j].suit !== 0 &&
+              !isBlockDisabled(i, j)
+            ) {
               const group = [];
               findConnected(i, j, board[i][j].suit, group);
               if (group.length >= 3) {
